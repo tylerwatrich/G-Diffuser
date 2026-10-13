@@ -94,3 +94,11 @@ numbers drift, so search by name.
   faulted the first render pass. The fix is a non-opaque `CAMetalLayer` plus `GdxForceScreenOpaque()`
   (an alpha-only pass before the screen encoder ends).
 - `nextDrawable()` is autoreleased, so retain it for the frame. Size fb0 from the drawable's real texture.
+- Menu transitions (title-screen curtain, etc.) snapshot the last frame. `GdxUpdateFrameMirror`
+  (`n64_gfx_bridge.cpp`) copies each finished frame into a 320x240 mirror FB, and
+  `gdx_read_current_framebuffer` reads it back. Metal needed two fixes: `CopyFramebuffer` now
+  does a scaled draw when the source and destination sizes differ (a blit can't resize), and
+  `ReadFramebufferToCPU` reads an FB not drawn this frame on the readback queue after waiting on
+  `mLastFrameCmdBufs`. The old path returned zeros on the first read, which meant black transitions.
+- Known cosmetic issue: the snapshot is 4:3 (320x240), so a widescreen frame visibly changes size
+  when the transition starts.
