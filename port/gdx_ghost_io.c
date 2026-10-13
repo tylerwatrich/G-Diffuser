@@ -933,6 +933,93 @@ int gdx_ghost_library_archive_sram(void) {
     return rc;
 }
 
+/* Speed Lap ghosts: the fastest single lap per course, kept OUTSIDE the player library (a one-lap
+ * time would beat every three-lap Time Attack ghost there and bury them). Stored as an ordinary
+ * validated GDG1 container at speedlap_ghosts/speedlap_<encodedCourse>.gdg next to the executable,
+ * and only overwritten by a strictly faster lap. Returns 1 = saved, 0 = existing file is as fast or
+ * faster, <0 = GDX_GHOST_ERR_*. */
+static int gdx_speed_lap_ghost_path(int32_t encodedCourseIndex, char* outPath, size_t outCap, int create) {
+    char base[1024];
+    char directory[1200];
+    int n;
+
+    if (encodedCourseIndex == 0 || !gdx_ghost_executable_directory(base, sizeof(base))) {
+        return 0;
+    }
+#ifdef _WIN32
+    n = snprintf(directory, sizeof(directory), "%s\\speedlap_ghosts", base);
+#else
+    n = snprintf(directory, sizeof(directory), "%s/speedlap_ghosts", base);
+#endif
+    if (n < 0 || (size_t) n >= sizeof(directory)) {
+        return 0;
+    }
+    if (create) {
+#ifdef _WIN32
+        if (!CreateDirectoryA(directory, NULL) && GetLastError() != ERROR_ALREADY_EXISTS) {
+            return 0;
+        }
+#else
+        if (mkdir(directory, 0755) != 0 && errno != EEXIST) {
+            return 0;
+        }
+#endif
+    }
+#ifdef _WIN32
+    n = snprintf(outPath, outCap, "%s\\speedlap_%08X.gdg", directory, (uint32_t) encodedCourseIndex);
+#else
+    n = snprintf(outPath, outCap, "%s/speedlap_%08X.gdg", directory, (uint32_t) encodedCourseIndex);
+#endif
+    return n >= 0 && (size_t) n < outCap;
+}
+
+int gdx_speed_lap_ghost_best_time(int32_t encodedCourseIndex, int32_t* outRaceTime) {
+    char path[1600];
+    GdxGhostSave* save;
+    GdxGhostLibraryEntry entry;
+    int rc;
+
+    if (outRaceTime == NULL || !gdx_speed_lap_ghost_path(encodedCourseIndex, path, sizeof(path), 0)) {
+        return GDX_GHOST_ERR_BAD_ARGS;
+    }
+    save = (GdxGhostSave*) malloc(sizeof(*save));
+    if (save == NULL) {
+        return GDX_GHOST_ERR_IO;
+    }
+    rc = gdx_ghost_read_container(path, save, &entry, 1);
+    free(save);
+    if (rc == GDX_GHOST_OK) {
+        *outRaceTime = entry.raceTime;
+    }
+    return rc;
+}
+
+int gdx_speed_lap_ghost_save(int courseIndex, const void* ghost) {
+    char path[1600];
+    GdxGhostSave* save;
+    int32_t existing;
+    int rc;
+    const GdxRuntimeGhost* g = (const GdxRuntimeGhost*) ghost;
+
+    if (g == NULL || !gdx_speed_lap_ghost_path(g->encodedCourseIndex, path, sizeof(path), 1)) {
+        return GDX_GHOST_ERR_BAD_ARGS;
+    }
+    if ((gdx_speed_lap_ghost_best_time(g->encodedCourseIndex, &existing) == GDX_GHOST_OK) &&
+        (existing <= g->raceTime)) {
+        return 0;
+    }
+    save = (GdxGhostSave*) malloc(sizeof(*save));
+    if (save == NULL) {
+        return GDX_GHOST_ERR_IO;
+    }
+    rc = gdx_ghost_build_save_from_runtime(courseIndex, g, save);
+    if (rc == GDX_GHOST_OK) {
+        rc = gdx_ghost_write_container(path, save);
+    }
+    free(save);
+    return (rc == GDX_GHOST_OK) ? 1 : rc;
+}
+
 int gdx_ghost_library_save_player(int courseIndex, const void* ghost) {
     GdxGhostSave* save;
     int rc;

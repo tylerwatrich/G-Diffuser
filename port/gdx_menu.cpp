@@ -654,6 +654,16 @@ GdxMenu::GdxMenu() : Ship::GuiWindow("gOpenMenuBar", false, "G-Diffuser Menu") {
     // Cpu_GenerateInputs (ovl_i3/cpu.c); past 100 the EXPERT-only gates drop too.
     // 100 = stock behavior.
     CVarRegisterInteger("gEnhancements.Gameplay.AiAggression", 100);
+    // Analog R2/L2 throttle+brake (input_bridge.c -> racer.c) and side attack mode (racer.c).
+    CVarRegisterInteger("gEnhancements.Input.AnalogTriggers", 0);
+    CVarRegisterInteger("gEnhancements.Gameplay.SideAttackMode", 0);
+    CVarRegisterInteger("gEnhancements.Gameplay.HoldToBoost", 1); // 0 off, 1 Speed Lap, 2 all races
+    CVarRegisterInteger("gEnhancements.Visuals.ShowCurrentLapTime", 0); // hud.c race clock shows current lap
+    CVarRegisterInteger("gEnhancements.Gameplay.HideLapCallouts", 0); // BOOSTER OK / FINAL LAP signs + voices
+    CVarRegisterInteger("gEnhancements.Gameplay.RefillEnergyEachLap", 1); // 0 off, 1 Speed Lap, 2 all races
+    CVarRegisterInteger("gEnhancements.Gameplay.FaceAttackLayout", 0); // 1 = Square left attack, Cross boost
+    CVarRegisterInteger("gEnhancements.Camera.FreeCamera", 0); // race free camera, camera.c
+    CVarRegisterInteger("gEnhancements.Camera.FreeCameraInvertX", 0);
 
     // CONTENT (E1 .gdxc export). Default 0 = track exports strip author ghosts + records
     // (privacy-first; POST_1_0_SCOPING section 2). Read in port/gdx_content_io.c.

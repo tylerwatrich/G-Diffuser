@@ -609,6 +609,92 @@ extern "C" int gdx_lus_read_pads(int capacity, unsigned short* outButtons, signe
     return 1;
 }
 
+// Analog trigger side channel (gEnhancements.Input.AnalogTriggers). The ControlDeck resolves
+// triggers to on/off N64 buttons, so the pressure is gone by the time the game sees it; this reads
+// the raw SDL axes per N64 port instead. R2 = throttle, L2 = brake, each 0..1. Ports with no
+// routed gamepad report 0.
+// Calls fn(pad, port) for each gamepad routed to an N64 port. When auto port routing is off
+// (no entries in sGdxGamepadPorts), the first open gamepad feeds port 1 so a single-pad setup
+// still works.
+template <typename Fn> static void gdxForEachRoutedPad(Fn&& fn) {
+    if (!sGdxGamepadPorts.empty()) {
+        for (const auto& [instanceId, port] : sGdxGamepadPorts) {
+            SDL_GameController* pad = SDL_GameControllerFromInstanceID(instanceId);
+            if (pad != nullptr) {
+                fn(pad, (int)port);
+            }
+        }
+        return;
+    }
+    for (int j = 0; j < SDL_NumJoysticks(); j++) {
+        if (SDL_IsGameController(j)) {
+            SDL_GameController* pad = SDL_GameControllerFromInstanceID(SDL_JoystickGetDeviceInstanceID(j));
+            if (pad != nullptr) {
+                fn(pad, 0);
+                return;
+            }
+        }
+    }
+}
+
+extern "C" void gdx_read_analog_triggers(int capacity, float* outThrottle, float* outBrake) {
+    for (int i = 0; i < capacity; i++) {
+        outThrottle[i] = 0.0f;
+        outBrake[i] = 0.0f;
+    }
+    gdxForEachRoutedPad([&](SDL_GameController* pad, int port) {
+        if (port < 0 || port >= capacity) {
+            return;
+        }
+        const float r2 = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) / 32767.0f;
+        const float l2 = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT) / 32767.0f;
+        outThrottle[port] = std::max(outThrottle[port], std::clamp(r2, 0.0f, 1.0f));
+        outBrake[port] = std::max(outBrake[port], std::clamp(l2, 0.0f, 1.0f));
+    });
+}
+
+// Physical face buttons for the face-button side attack (gEnhancements.Gameplay.SideAttackMode
+// == 2): SDL "A" = bottom face (Cross on PlayStation), SDL "B" = right face (Circle),
+// SDL "Y" = top face (Triangle, spin attack), SDL "X" = left face (Square).
+extern "C" void gdx_read_face_ab(int capacity, unsigned char* outA, unsigned char* outB, unsigned char* outY,
+                                 unsigned char* outX) {
+    for (int i = 0; i < capacity; i++) {
+        outA[i] = 0;
+        outB[i] = 0;
+        outY[i] = 0;
+        outX[i] = 0;
+    }
+    gdxForEachRoutedPad([&](SDL_GameController* pad, int port) {
+        if (port < 0 || port >= capacity) {
+            return;
+        }
+        outA[port] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_A) ? 1 : 0;
+        outB[port] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_B) ? 1 : 0;
+        outY[port] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_Y) ? 1 : 0;
+        outX[port] |= SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_X) ? 1 : 0;
+    });
+}
+
+// Raw right stick per N64 port for the race free camera (gEnhancements.Camera.FreeCamera),
+// -1..1 with SDL's convention (Y negative = up).
+extern "C" void gdx_read_right_stick(int capacity, float* outX, float* outY) {
+    for (int i = 0; i < capacity; i++) {
+        outX[i] = 0.0f;
+        outY[i] = 0.0f;
+    }
+    gdxForEachRoutedPad([&](SDL_GameController* pad, int port) {
+        if (port < 0 || port >= capacity) {
+            return;
+        }
+        const float x = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_RIGHTX) / 32767.0f;
+        const float y = SDL_GameControllerGetAxis(pad, SDL_CONTROLLER_AXIS_RIGHTY) / 32767.0f;
+        if ((x * x + y * y) > (outX[port] * outX[port] + outY[port] * outY[port])) {
+            outX[port] = std::clamp(x, -1.0f, 1.0f);
+            outY[port] = std::clamp(y, -1.0f, 1.0f);
+        }
+    });
+}
+
 // Deliberately no single-port variant: looping one over four ports would silently break the
 // wheel buffer and input-lag deque described above.
 

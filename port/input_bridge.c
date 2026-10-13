@@ -92,6 +92,30 @@ extern s32 D_800CCFB0;
 // MUST be a single batched call rather than four per-port reads: ControlDeck::WriteToPad() has
 // per-call side effects (mouse-wheel buffer decay, the simulated-input-lag pad deque) that only
 // behave correctly when it runs once per frame. See gdx_lus_read_pads() in main.cpp.
+// Analog trigger throttle/brake (gEnhancements.Input.AnalogTriggers). Implemented in main.cpp.
+// Read per N64 port each poll; racer.c scales thrust and brake damping by these. A digital
+// A / C-Down press reports 1.0, so keyboards and non-analog pads behave exactly as before.
+extern void gdx_read_analog_triggers(int capacity, float* out_throttle, float* out_brake);
+float gGdxThrottle[MAXCONTROLLERS];
+float gGdxBrake[MAXCONTROLLERS];
+#define GDX_TRIGGER_DEADZONE 0.04f
+
+// Face-button side attack (SideAttackMode == 2). Cross fires a left side attack, Circle a right
+// one. Press edges are latched here (BTN_Z = left, BTN_R = right) and consumed by racer.c.
+extern void gdx_read_face_ab(int capacity, u8* out_a, u8* out_b, u8* out_y, u8* out_x);
+u16 gGdxFaceSideAttack[MAXCONTROLLERS];
+// Triangle press edge in face-button mode: spin attack, latched until racer.c consumes it.
+u8 gGdxFaceSpinAttack[MAXCONTROLLERS];
+
+// Race free camera (gEnhancements.Camera.FreeCamera): raw right stick per port, read by
+// decomp camera.c. Zero when the option is off or outside a live race.
+extern void gdx_read_right_stick(int capacity, float* out_x, float* out_y);
+float gGdxRightStickX[MAXCONTROLLERS];
+float gGdxRightStickY[MAXCONTROLLERS];
+#define GDX_FREECAM_DEADZONE 0.15f
+// Right stick pushed down (within ~35 degrees of straight down) = the stock C-Up look-back.
+u8 gGdxFreeCamLookBack[MAXCONTROLLERS];
+
 extern int gdx_lus_read_pads(int capacity, u16* out_buttons, s8* out_stick_x, s8* out_stick_y,
                              u8* out_connected);
 
@@ -783,6 +807,157 @@ void gdx_controller_poll(void) {
         memset(stick_x, 0, sizeof(stick_x));
         memset(stick_y, 0, sizeof(stick_y));
         memset(connected, 0, sizeof(connected));
+    }
+
+    // Unpause swallow: a face button still held from the pause menu (e.g. the press that chose
+    // Continue) must not act in the race. On the paused -> running edge, the A/B bits held at
+    // that instant are suppressed until each is released; a fresh press then works normally.
+    {
+        static s8 sPrevPaused = 0;
+        static u16 sUnpauseSuppress[MAXCONTROLLERS];
+        const u16 faceBits = BTN_A | BTN_B;
+        for (i = 0; i < MAXCONTROLLERS; i++) {
+            if ((sPrevPaused != 0) && (gGamePaused == 0)) {
+                sUnpauseSuppress[i] = buttons[i] & faceBits;
+            }
+            sUnpauseSuppress[i] &= buttons[i]; // released bits stop being suppressed
+            buttons[i] &= ~sUnpauseSuppress[i];
+        }
+        sPrevPaused = gGamePaused;
+    }
+
+    // Race free camera: the right stick orbits the camera (camera.c). While it is deflected, the
+    // C-buttons it is normally bound to are suppressed so looking around never brakes or switches
+    // the camera view.
+    {
+        const int freeCamOn = CVarGetInteger("gEnhancements.Camera.FreeCamera", 0) &&
+                              gdx_gamemode_is_race(gGameMode) && (gGamePaused == 0);
+        if (freeCamOn) {
+            gdx_read_right_stick(MAXCONTROLLERS, gGdxRightStickX, gGdxRightStickY);
+        }
+        for (i = 0; i < MAXCONTROLLERS; i++) {
+            const float sx = gGdxRightStickX[i];
+            const float sy = gGdxRightStickY[i];
+            gGdxFreeCamLookBack[i] = 0;
+            if (!freeCamOn) {
+                gGdxRightStickX[i] = 0.0f;
+                gGdxRightStickY[i] = 0.0f;
+                continue;
+            }
+            if (((sx * sx) + (sy * sy)) > (GDX_FREECAM_DEADZONE * GDX_FREECAM_DEADZONE)) {
+                buttons[i] &= ~(BTN_CUP | BTN_CDOWN | BTN_CLEFT | BTN_CRIGHT);
+                // SDL Y is positive = down. tan(35deg) ~= 0.7.
+                if ((sy > 0.5f) && (((sx < 0.0f) ? -sx : sx) < (sy * 0.7f))) {
+                    gGdxFreeCamLookBack[i] = 1;
+                    buttons[i] |= BTN_CUP;
+                }
+            }
+        }
+    }
+
+    // Analog triggers: R2 accelerates and L2 brakes in proportion to pressure. Only in a live
+    // race (not paused, not menus), so R2 never confirms a menu item. The digital bits are set so
+    // every existing "is A held" / "is C-Down held" check in the game still fires; racer.c then
+    // scales the actual thrust and brake by the analog value.
+    {
+        float throttle[MAXCONTROLLERS];
+        float brake[MAXCONTROLLERS];
+        const int analogOn = CVarGetInteger("gEnhancements.Input.AnalogTriggers", 0) &&
+                             gdx_gamemode_is_race(gGameMode) && (gGamePaused == 0);
+        if (analogOn) {
+            gdx_read_analog_triggers(MAXCONTROLLERS, throttle, brake);
+        }
+
+        // Face-button side attack needs R2 to accelerate, so it is only live with analog triggers
+        // on. Cross stops meaning "accelerate" while it is the left side-attack button.
+        {
+            static u8 sPrevFaceA[MAXCONTROLLERS];
+            static u8 sPrevFaceB[MAXCONTROLLERS];
+            static u8 sPrevFaceY[MAXCONTROLLERS];
+            static u8 sPrevFaceX[MAXCONTROLLERS];
+            static u8 sCrossBoostArmed[MAXCONTROLLERS];
+            u8 faceA[MAXCONTROLLERS];
+            u8 faceB[MAXCONTROLLERS];
+            u8 faceY[MAXCONTROLLERS];
+            u8 faceX[MAXCONTROLLERS];
+            // FaceAttackLayout: 0 = Cross left / Square boost, 1 = Square left / Cross boost.
+            const int squareLeft = CVarGetInteger("gEnhancements.Gameplay.FaceAttackLayout", 0) == 1;
+            const int faceOn =
+                analogOn && (CVarGetInteger("gEnhancements.Gameplay.SideAttackMode", 0) == 2);
+            if (faceOn) {
+                gdx_read_face_ab(MAXCONTROLLERS, faceA, faceB, faceY, faceX);
+            } else {
+                // Off (menus, paused): report the buttons as held, so the first running frame
+                // never sees a press edge from a button held through unpause. A real release
+                // followed by a press is needed to attack.
+                memset(faceA, 1, sizeof(faceA));
+                memset(faceB, 1, sizeof(faceB));
+                memset(faceY, 1, sizeof(faceY));
+                memset(faceX, 1, sizeof(faceX));
+            }
+            for (i = 0; i < MAXCONTROLLERS; i++) {
+                if (!faceOn) {
+                    gGdxFaceSideAttack[i] = 0; // nothing carries over into a race from menus
+                    gGdxFaceSpinAttack[i] = 0;
+                    sCrossBoostArmed[i] = 0; // Cross must be released in-race before it boosts
+                } else {
+                    const u8 leftNow = squareLeft ? faceX[i] : faceA[i];
+                    const u8 leftPrev = squareLeft ? sPrevFaceX[i] : sPrevFaceA[i];
+                    if (faceY[i] && !sPrevFaceY[i]) {
+                        gGdxFaceSpinAttack[i] = 1;
+                    }
+                    if (leftNow && !leftPrev) {
+                        gGdxFaceSideAttack[i] = BTN_Z; // latest press wins until racer.c consumes it
+                    }
+                    if (faceB[i] && !sPrevFaceB[i]) {
+                        gGdxFaceSideAttack[i] = BTN_R;
+                    }
+                    if (faceA[i]) {
+                        buttons[i] &= ~BTN_A;
+                    }
+                    if (squareLeft) {
+                        // Square is the attack button now, so it stops boosting; Cross boosts
+                        // instead (only once released after a pause/menu, so the unpause press
+                        // never fires a boost).
+                        if (faceX[i]) {
+                            buttons[i] &= ~BTN_B;
+                        }
+                        if (!faceA[i]) {
+                            sCrossBoostArmed[i] = 1;
+                        } else if (sCrossBoostArmed[i]) {
+                            buttons[i] |= BTN_B;
+                        }
+                    }
+                }
+                sPrevFaceA[i] = faceA[i];
+                sPrevFaceB[i] = faceB[i];
+                sPrevFaceY[i] = faceY[i];
+                sPrevFaceX[i] = faceX[i];
+            }
+        }
+        for (i = 0; i < MAXCONTROLLERS; i++) {
+            if (!analogOn) {
+                gGdxThrottle[i] = 1.0f;
+                gGdxBrake[i] = 1.0f;
+                continue;
+            }
+            float t = (throttle[i] > GDX_TRIGGER_DEADZONE) ? throttle[i] : 0.0f;
+            float b = (brake[i] > GDX_TRIGGER_DEADZONE) ? brake[i] : 0.0f;
+            if (buttons[i] & BTN_A) {
+                t = 1.0f;
+            }
+            if (buttons[i] & BTN_CDOWN) {
+                b = 1.0f;
+            }
+            if (t > 0.0f) {
+                buttons[i] |= BTN_A;
+            }
+            if (b > 0.0f) {
+                buttons[i] |= BTN_CDOWN;
+            }
+            gGdxThrottle[i] = t;
+            gGdxBrake[i] = b;
+        }
     }
 
     // Port 1 is pinned connected — see the PORT 1 IS PINNED note on gdx_sync_controller_ports().

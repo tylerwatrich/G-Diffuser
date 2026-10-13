@@ -1572,6 +1572,17 @@ void GdxMenu::RegisterMenu() {
     // The CVars themselves are registered in the GdxMenu constructor, alongside what each does.
     // ═════════════════════════════════════════════════════════════════════════════════════════
     AddWidget("Enhancements", "Visuals", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Show current lap time",
+                          .cVar = "gEnhancements.Visuals.ShowCurrentLapTime",
+                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+                  .Options(UIWidgets::CheckboxOptions().DefaultValue(false).Tooltip(
+                      "The race clock counts the current lap instead of the total race time.\n"
+                      "In Practice and Speed Lap it adds a running lap timer, which is\n"
+                      "otherwise hidden. Completed lap times still flash as normal."))
+                  .ModifiedMarker()
+                  .SearchTerms("current lap time timer clock hud speed lap practice"));
+
+    AddWidget("Enhancements", "Visuals", SECTION_COLUMN_1,
               WidgetInfo{ .name = "Visual Enhancements", .type = GdxUI::WIDGET_SEPARATOR_TEXT });
 
     // Read live in interpreter.cpp AdjXForAspectRatio. OFF has two known edge cases: MSAA>1 at
@@ -1913,6 +1924,122 @@ void GdxMenu::RegisterMenu() {
     // Community request F5: Cpu_GenerateInputs (ovl_i3/cpu.c) scales the spin/side-attack
     // and retaliation probabilities by this percent; past 100 the EXPERT-only combat gates
     // drop, so lower difficulties join in. 100 = stock.
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Analog triggers (R2 throttle, L2 brake)",
+                          .cVar = "gEnhancements.Input.AnalogTriggers",
+                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+                  .Options(UIWidgets::CheckboxOptions().DefaultValue(false).Tooltip(
+                      "In races, R2 accelerates and L2 brakes in proportion to how far\n"
+                      "you press them. A and C-Down still give full throttle / full brake.\n"
+                      "Only active during a race (not in menus or while paused), so R2\n"
+                      "never confirms a menu item. Needs a controller with analog triggers."))
+                  .ModifiedMarker()
+                  .SearchTerms("analog trigger pressure sensitive throttle accelerate brake r2 l2 gamepad"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Side attack",
+                          .cVar = "gEnhancements.Gameplay.SideAttackMode",
+                          .type = GdxUI::WIDGET_CVAR_COMBOBOX }
+                  .ComboItems({
+                      "Stock (double-tap Z / R)", // 0
+                      "Single press Z / R",       // 1
+                      "Face buttons (Cross / Circle)" // 2
+                  })
+                  .Options(UIWidgets::ComboboxOptions()
+                               .DefaultIndex(0)
+                               .LabelPosition(UIWidgets::LabelPositions::Near)
+                               .Tooltip("Single press Z / R: one press of Z or R (the bumpers by default)\n"
+                                        "fires a side attack; Z with R held still spins.\n"
+                                        "Face buttons: Cross = left, Circle = right, Triangle = spin toward\n"
+                                        "the stick (clockwise with no stick). Needs Analog triggers\n"
+                                        "on, since R2 takes over accelerating from Cross.\n"
+                                        "In both modes a press made during a side attack is queued, so\n"
+                                        "attacks chain one press each. Players only."))
+                  .ModifiedMarker()
+                  .SearchTerms("side attack single press tap bumper face button cross circle chain z r"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Face button layout",
+                          .cVar = "gEnhancements.Gameplay.FaceAttackLayout",
+                          .type = GdxUI::WIDGET_CVAR_COMBOBOX }
+                  .ComboItems({
+                      "Cross left attack / Square boost", // 0
+                      "Square left attack / Cross boost"  // 1
+                  })
+                  .Options(UIWidgets::ComboboxOptions()
+                               .DefaultIndex(0)
+                               .LabelPosition(UIWidgets::LabelPositions::Near)
+                               .Tooltip("Which button does the left side attack in the Face buttons side\n"
+                                        "attack mode. Circle is always right attack, Triangle spin."))
+                  .ModifiedMarker()
+                  .SearchTerms("face button layout square cross boost left attack swap"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Free camera (right stick)",
+                          .cVar = "gEnhancements.Camera.FreeCamera",
+                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+                  .Options(UIWidgets::CheckboxOptions().DefaultValue(false).Tooltip(
+                      "In races, push the right stick to look around your machine:\n"
+                      "up = ahead, sideways = that side, down = behind. How far you push\n"
+                      "sets how far it turns; let go and it eases back behind the car.\n"
+                      "The stick's C-button actions are ignored while it is moved."))
+                  .ModifiedMarker()
+                  .SearchTerms("free camera look around orbit rotate right stick c buttons"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Invert free camera left/right",
+                          .cVar = "gEnhancements.Camera.FreeCameraInvertX",
+                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+                  .Options(UIWidgets::CheckboxOptions().DefaultValue(false).Tooltip(
+                      "Swap which way the free camera turns for left/right stick."))
+                  .ModifiedMarker()
+                  .SearchTerms("free camera invert flip left right"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Refill energy every lap",
+                          .cVar = "gEnhancements.Gameplay.RefillEnergyEachLap",
+                          .type = GdxUI::WIDGET_CVAR_COMBOBOX }
+                  .ComboItems({
+                      "Off",             // 0
+                      "Speed Lap only",  // 1
+                      "All races"        // 2
+                  })
+                  .Options(UIWidgets::ComboboxOptions()
+                               .DefaultIndex(1)
+                               .LabelPosition(UIWidgets::LabelPositions::Near)
+                               .Tooltip("Tops your energy up to full each time you cross the line.\n"
+                                        "Players only; CPU racers never get the refill."))
+                  .ModifiedMarker()
+                  .SearchTerms("refill energy health every lap speed lap restore"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Hide BOOSTER OK / FINAL LAP callouts",
+                          .cVar = "gEnhancements.Gameplay.HideLapCallouts",
+                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+                  .Options(UIWidgets::CheckboxOptions().DefaultValue(false).Tooltip(
+                      "Hides the lap-2 BOOSTER OK!! sign and \"You got boost power\" voice, and the\n"
+                      "FINAL LAP sign and voice, in every race. Speed Lap always hides them."))
+                  .ModifiedMarker()
+                  .SearchTerms("booster ok final lap voice announcer callout sign hide"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Hold boost to chain boosts",
+                          .cVar = "gEnhancements.Gameplay.HoldToBoost",
+                          .type = GdxUI::WIDGET_CVAR_COMBOBOX }
+                  .ComboItems({
+                      "Off",            // 0
+                      "Speed Lap only", // 1
+                      "All races"       // 2
+                  })
+                  .Options(UIWidgets::ComboboxOptions()
+                               .DefaultIndex(1)
+                               .LabelPosition(UIWidgets::LabelPositions::Near)
+                               .Tooltip("Keep holding boost and the next boost fires as soon as the\n"
+                                        "current one ends, so you don't have to mash. Each boost\n"
+                                        "still costs energy as normal. Players only."))
+                  .ModifiedMarker()
+                  .SearchTerms("hold boost chain auto repeat mash speed lap"));
+
     AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
               WidgetInfo{ .name = "AI aggression (%)", .cVar = "gEnhancements.Gameplay.AiAggression",
                           .type = GdxUI::WIDGET_CVAR_SLIDER_INT }

@@ -178,6 +178,10 @@ int gdx_ghost_library_archive_sram(void);
  * `ghost` must point to the real decomp Ghost layout (decomp/include/unk_structs.h). This is the
  * port/decomp boundary used by Save_SaveGhost and autosave-on-record. */
 int gdx_ghost_library_save_player(int courseIndex, const void* ghost);
+/* Speed Lap: fastest single-lap ghost per course, stored apart from the player library in
+ * speedlap_ghosts/. save returns 1 saved, 0 not faster than the stored one, <0 error. */
+int gdx_speed_lap_ghost_save(int courseIndex, const void* ghost);
+int gdx_speed_lap_ghost_best_time(int32_t encodedCourseIndex, int32_t* outRaceTime);
 
 /* Compatibility queries for one exact course. When several entries exist these return/load the
  * fastest valid replay. New gameplay staging should use gdx_ghost_library_load_selected(). */
