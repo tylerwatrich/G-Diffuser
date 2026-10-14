@@ -810,12 +810,15 @@ void gdx_controller_poll(void) {
     }
 
     // Unpause swallow: a face button still held from the pause menu (e.g. the press that chose
-    // Continue) must not act in the race. On the paused -> running edge, the A/B bits held at
-    // that instant are suppressed until each is released; a fresh press then works normally.
+    // Continue) must not act in the race. On the paused -> running edge, the bits held at that
+    // instant are suppressed until each is released; a fresh press then works normally.
+    // The accelerator is never swallowed, so unpausing with it held keeps you on the throttle:
+    // that's A here (R2 with analog triggers is added after this, from the trigger itself). The
+    // face-button side attacks and Cross-as-boost below already need a fresh press after a pause.
     {
         static s8 sPrevPaused = 0;
         static u16 sUnpauseSuppress[MAXCONTROLLERS];
-        const u16 faceBits = BTN_A | BTN_B;
+        const u16 faceBits = BTN_B;
         for (i = 0; i < MAXCONTROLLERS; i++) {
             if ((sPrevPaused != 0) && (gGamePaused == 0)) {
                 sUnpauseSuppress[i] = buttons[i] & faceBits;

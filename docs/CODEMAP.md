@@ -33,8 +33,11 @@ numbers drift, so search by name.
 ## Game modes
 
 - `gGameMode` (`GAMEMODE_*`) selects the mode. Sub-options live in `gModeSubOption[MODE_*]`.
-- **Speed Lap** is Time Attack with `gModeSubOption[MODE_TIME_ATTACK] == 2`. Check it with
-  `Gdx_SpeedLapActive()` (`common.c`). The menu entry is in `overlays/ovl_i6/main_menu.c`.
+- **Speed Lap** is the first entry (index 0) in the Practice board's submenu
+  (`overlays/ovl_i6/main_menu.c`; the difficulties move to 1..4). On confirm, the menu sets
+  `gGdxSpeedLapSelected`. `CourseSelect_Init` then switches `gSelectedMode` to Time Attack (done there,
+  not in the menu, because the menu keeps drawing for a few frames and would flash the Time Attack
+  submenu), and `MainMenu_Init` switches back to Practice so the cursor returns to the right board. Check it with `Gdx_SpeedLapActive()` (`common.c`): Time Attack plus the flag.
 - Racer count is set in `racer.c` init: Time Attack, Records and Course Edit use 1 racer; GP,
   Practice and Death Race use 30.
 
@@ -49,6 +52,9 @@ numbers drift, so search by name.
 - Speed Lap moves the lone racer back 29 more slots (the back of a 30-car grid). The rolling start
   (`gEnhancements.Gameplay.SpeedLapFlyingStart`) goes another 21000 units back, capped at 45% of the
   course length, and records the back-of-grid point's lap distance.
+
+- Gaps: a segment whose `trackSegmentInfo & TRACK_SHAPE_MASK == TRACK_SHAPE_AIR` has no road. The
+  Speed Lap start backs up past these to 500 units of solid track.
 
 ## Race intro / countdown
 
@@ -76,6 +82,13 @@ numbers drift, so search by name.
 - Countdown sign ("Mr. Zero" with the 3-2-1 screen): drawn in the race render with matrix
   `unk_21988[player]`, built in `Racer_Update` from the racer's position + 50 units forward + height,
   pulled toward the camera. Rolling start leads it by one frame of velocity.
+- CPU lane coordinate: `racer->unk_33C` is the target lateral offset (+ = right). The CPU steers so
+  that `unk_33C + (segmentDisplacement · segmentBasis.z) → 0`. The track middle is
+  `(currentRadiusRight - currentRadiusLeft) / 2`, and the machine half-width is about 46. Per-segment
+  hazards come from `COURSE_CONTEXT()->courseData.{dirt,landmine,pit,jump,ice,dash}[segmentIndex]`,
+  cached on the racer as `segmentDirt` / `nextSegmentDirt` etc. by `Cpu_GenerateInputs`.
+  `DIRT_LEFT` / `DIRT_RIGHT` / `DIRT_BOTH` / `DIRT_MIDDLE`. The rolling-start autopilot steers to the
+  middle and dodges dirt.
 - Engine ignition: `racer->unk_17C` is hover height, which also scales booster flame size. It starts at
   the idle value `D_800F80A4` (no flames) and ramps to 13 once the player presses a button after
   timer 250. Rolling start sets it to 13 at release.

@@ -2030,6 +2030,17 @@ void GdxMenu::RegisterMenu() {
                   .SearchTerms("speed lap rolling flying start run-up launch"));
 
     AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Rolling start: stock CPU driver",
+                          .cVar = "gEnhancements.Gameplay.SpeedLapRollingStockAi",
+                          .type = GdxUI::WIDGET_CVAR_CHECKBOX }
+                  .Options(UIWidgets::CheckboxOptions().DefaultValue(true).Tooltip(
+                      "The game's own CPU driver handles the rolling-start run-in (its racing line,\n"
+                      "boosts and speed control). Off: a centre-line autopilot that holds the\n"
+                      "accelerator, never boosts and dodges dirt."))
+                  .ModifiedMarker()
+                  .SearchTerms("speed lap rolling start cpu ai autopilot stock"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
               WidgetInfo{ .name = "Hide BOOSTER OK / FINAL LAP callouts",
                           .cVar = "gEnhancements.Gameplay.HideLapCallouts",
                           .type = GdxUI::WIDGET_CVAR_CHECKBOX }
