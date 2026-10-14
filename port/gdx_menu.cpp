@@ -661,6 +661,7 @@ GdxMenu::GdxMenu() : Ship::GuiWindow("gOpenMenuBar", false, "G-Diffuser Menu") {
     CVarRegisterInteger("gEnhancements.Visuals.ShowCurrentLapTime", 0); // hud.c race clock shows current lap
     CVarRegisterInteger("gEnhancements.Gameplay.HideLapCallouts", 0); // BOOSTER OK / FINAL LAP signs + voices
     CVarRegisterInteger("gEnhancements.Gameplay.RefillEnergyEachLap", 1); // 0 off, 1 Speed Lap, 2 all races
+    CVarRegisterInteger("gEnhancements.Gameplay.SpeedLapFlyingStart", 0); // 0 run-up from standstill, 1 rolling
     CVarRegisterInteger("gEnhancements.Gameplay.FaceAttackLayout", 0); // 1 = Square left attack, Cross boost
     CVarRegisterInteger("gEnhancements.Camera.FreeCamera", 0); // race free camera, camera.c
     CVarRegisterInteger("gEnhancements.Camera.FreeCameraInvertX", 0);

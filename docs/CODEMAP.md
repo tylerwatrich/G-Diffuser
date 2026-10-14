@@ -46,7 +46,49 @@ numbers drift, so search by name.
   from the segment radius (capped at 50). In single player, each slot steps back 100 units.
 - Walking backward along the spline: `t -= dist / Course_SplineGetTangent(...)`. When `t < 0`,
   move to `->prev` and rescale by the tangent ratio (see the loop at the end of the function).
-- Speed Lap moves the lone racer back 29 more slots (the back of a 30-car grid).
+- Speed Lap moves the lone racer back 29 more slots (the back of a 30-car grid). The rolling start
+  (`gEnhancements.Gameplay.SpeedLapFlyingStart`) goes another 21000 units back, capped at 45% of the
+  course length, and records the back-of-grid point's lap distance.
+
+## Race intro / countdown
+
+- `gRaceIntroTimer` starts at 460 (100 in the course editor) and counts down in `Racer_Update`.
+  The flyover runs first, then 3-2-1 from 220. **GO is at 40**: every racer gets
+  `RACER_STATE_FLAGS_400000`.
+- Without `RACER_STATE_FLAGS_400000`, `Racer_UpdateFromControls` zeroes all input, which is what
+  holds machines on the grid.
+- `RACER_STATE_CPU_CONTROLLED` makes `Racer_UpdateMovement` drive the racer with
+  `Cpu_GenerateInputs` (it's also used on the player after they finish). **The CPU driver overwrites
+  the racer's handling stats** (`unk_1B0`-`unk_1D0`, turn rates `unk_1E0`/`unk_1E4`, `unk_1E8`,
+  `unk_1EC`, grip `unk_1F8`), so handing a machine back to a player means restoring them.
+- The Speed Lap rolling start sets both flags on `gRacers[0]` at timer 459 and snapshots the racer.
+  It holds the timer at 221 (just before "3") until the remaining distance to the back of the grid
+  is at most `speed * (180 + 300)`, so GO lands about 5 seconds before the back of the grid. At GO it clears CPU control and restores the stats.
+- Rolling run-in driving (`Racer_UpdateMovement`): the CPU's buttons are replaced
+  with A held (no boost, Z/R or attacks), and the player's handling stats are restored every
+  frame. Steering is a simple centre-line controller:
+  `stickX = 0.4 * (segmentDisplacement · segmentBasis.z) + 300 * (trueBasis.x · segmentBasis.z)`,
+  clamped to ±50. The CPU's own lane target is `racer->unk_33C`.
+- Speed units: HUD km/h = `racer->speed * 21.6`; `speed` is |velocity| in units per frame. There is no
+  top-speed stat: non-boost top speed emerges from engine force (`unk_1B8` at full speed) against drag.
+  The rolling start launches at 1000 km/h along `segmentPositionInfo.segmentForward` and lets physics
+  settle it to the machine's real top speed.
+- Countdown sign ("Mr. Zero" with the 3-2-1 screen): drawn in the race render with matrix
+  `unk_21988[player]`, built in `Racer_Update` from the racer's position + 50 units forward + height,
+  pulled toward the camera. Rolling start leads it by one frame of velocity.
+- Engine ignition: `racer->unk_17C` is hover height, which also scales booster flame size. It starts at
+  the idle value `D_800F80A4` (no flames) and ramps to 13 once the player presses a button after
+  timer 250. Rolling start sets it to 13 at release.
+- Intro audio: `Audio_StartDemo` (timer 460) plays the intro fanfare and sets `D_80771CA8`, which
+  mutes player engine sound until GO. In EK builds the engine sound is armed by `func_800BAE5C`,
+  called from the `NA_SE_11` (GO) handler. Rolling start skips the fanfare and arms the engine at release.
+- Machine shadows and booster flame **tails** (length = `speed * 0.9`, drawn only at the closest
+  booster LOD `unk_2B3 == 2`): while `gRaceIntroTimer >= 280` the render pass skips shadows and zeroes
+  `speed` for racers 0-3, so no tails show. Rolling start bypasses this.
+- Intro camera: `Camera_UpdateRaceIntro` (`camera.c`) orbits for `camera->timer` 0→300, then switches
+  to `CAMERA_MODE_SETUP_RACE`. Setting the timer to 300 skips the fly-around (done for rolling start).
+- Lap crossings normally only count once `gRaceIntroTimer < 40`. Speed Lap's player is exempt, so
+  a rolling start that reaches the line early still starts the clock.
 
 ## Racers: laps and timing
 

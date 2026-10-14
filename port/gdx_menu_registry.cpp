@@ -2013,6 +2013,23 @@ void GdxMenu::RegisterMenu() {
                   .SearchTerms("refill energy health every lap speed lap restore"));
 
     AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
+              WidgetInfo{ .name = "Speed Lap start",
+                          .cVar = "gEnhancements.Gameplay.SpeedLapFlyingStart",
+                          .type = GdxUI::WIDGET_CVAR_COMBOBOX }
+                  .ComboItems({
+                      "Run-up",  // 0
+                      "Rolling"  // 1
+                  })
+                  .Options(UIWidgets::ComboboxOptions()
+                               .DefaultIndex(0)
+                               .LabelPosition(UIWidgets::LabelPositions::Near)
+                               .Tooltip("Run-up: start from a standstill at the back of the grid.\n"
+                                        "Rolling: start further back, already driving through the countdown on\n"
+                                        "autopilot, and take over at GO at full speed."))
+                  .ModifiedMarker()
+                  .SearchTerms("speed lap rolling flying start run-up launch"));
+
+    AddWidget("Enhancements", "Gameplay", SECTION_COLUMN_1,
               WidgetInfo{ .name = "Hide BOOSTER OK / FINAL LAP callouts",
                           .cVar = "gEnhancements.Gameplay.HideLapCallouts",
                           .type = GdxUI::WIDGET_CVAR_CHECKBOX }
