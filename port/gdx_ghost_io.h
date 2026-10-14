@@ -182,6 +182,11 @@ int gdx_ghost_library_save_player(int courseIndex, const void* ghost);
  * speedlap_ghosts/. save returns 1 saved, 0 not faster than the stored one, <0 error. */
 int gdx_speed_lap_ghost_save(int courseIndex, const void* ghost);
 int gdx_speed_lap_ghost_best_time(int32_t encodedCourseIndex, int32_t* outRaceTime);
+/* Loads the stored Speed Lap record ghost for `encodedCourseIndex` into a runtime decomp Ghost. */
+int gdx_speed_lap_ghost_load(int32_t encodedCourseIndex, void* outGhost);
+/* Per-machine best lap on a course (machineKey from racer.c's Racer_GdxMachineKey). */
+int gdx_speed_lap_machine_ghost_save(int courseIndex, uint32_t machineKey, const void* ghost);
+int gdx_speed_lap_machine_ghost_load(int32_t encodedCourseIndex, uint32_t machineKey, void* outGhost);
 
 /* Compatibility queries for one exact course. When several entries exist these return/load the
  * fastest valid replay. New gameplay staging should use gdx_ghost_library_load_selected(). */

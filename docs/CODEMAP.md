@@ -127,6 +127,28 @@ numbers drift, so search by name.
   (`Racer_GdxSpeedLapStartTiming`). The best lap is saved as a one-lap ghost
   (`Racer_GdxSpeedLapLapDone`, `port/gdx_ghost_io.c`) and replayed in ghost slot 0 / `gRacers[1]`.
 
+## Speed Lap records
+
+- Per-course record ghost: `speedlap_ghosts/speedlap_<encodedCourse>.gdg` (`port/gdx_ghost_io.c`:
+  `gdx_speed_lap_ghost_save/_load/_best_time`). It is loaded at race load from `func_8008D8E8`, the same place stock Time Attack builds its ghost
+  machine models (`func_8008D5F4(machineInfo, 7..9)` → `racer->machineIndex`). The record ghost's
+  machine uses slot 7. Attract-mode demos run as Time Attack, which is why `Gdx_SpeedLapActive()`
+  excludes them.
+- HUD textures: timer digit rects (`Hud_DrawTimerDigitRectangle`) index into whatever texture is
+  loaded (`aTimerSymbolsTex`), so reload it after drawing anything else, like a font.
+- Per-machine best: `speedlap_<encodedCourse>_m<key>.gdg` (`gdx_speed_lap_machine_ghost_save/_load`).
+  The key comes from `Racer_GdxMachineKey`: the character plus an edited custom machine's parts (colours
+  don't count). Its model is built in machine slot 8. The HUD doesn't show its time.
+- Ghost slots: 0 is the all-time record (`gRacers[1]`). 2 is the player machine's best (`gRacers[3]`),
+  hidden when the record was set with the same machine. 1 is this session's best (`gRacers[2]`), shown
+  only while slower than the machine best. All are re-armed at every line crossing
+  (`Racer_GdxSpeedLapArmGhosts`).
+- Lap replays are anchored to a fixed origin, the start-line spline point
+  (`Course_SplineGetPosition(&courseSegments[0], 0)`), so ghosts from other sessions line up.
+- HUD: `Hud_GdxDrawSpeedLapRecord` (`hud.c`) draws a RECORD / NEW RECORD! label and the cyan time
+  on the right under the race timer (FONT_SET_2 label at 230,64; right-anchored in widescreen).
+  `gGdxSpeedLapNewRecordTimer` controls the flashing.
+
 ## Port: N64 address translation (`port/n64_gfx_bridge.cpp`)
 
 - Game data still contains 32-bit N64-style pointers. Truncated low-32 values are matched
